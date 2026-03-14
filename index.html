@@ -1,0 +1,725 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TRẦN TRỌNG KIM - 0964567806</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+    body { font-family: 'Inter', sans-serif; background-color: #f1f5f9; }
+    
+    /* ĐÃ SỬA: Lề chuẩn Thông tư: Trái 3cm, Phải cm, Trên/Dưới 2cm */
+    .word-content { 
+        width: 21cm; 
+        min-height: 29.7cm; 
+        padding-top: 2cm; 
+        padding-bottom: 2cm; 
+        padding-left: 3cm; 
+        padding-right: 2cm; 
+        margin: auto; 
+        background: white; 
+        box-shadow: 0 0 10px rgba(0,0,0,0.1); 
+        font-family: 'Times New Roman', Times, serif; 
+        line-height: 1.3; 
+    }
+    
+    table { border-collapse: collapse; width: 100%; border: 0.5pt solid black; margin-top: 10px; }
+    
+    /* ĐÃ SỬA: Bỏ border mặc định của td để logic ở dưới có tác dụng */
+    td { padding: 8px; vertical-align: top; line-height: 1.2; }
+    
+    .integrated-line { display: block; margin-bottom: 2pt; }
+    .img-preview-container { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px; }
+    .img-item { position: relative; width: 80px; height: 80px; border: 2px solid #3b82f6; border-radius: 8px; overflow: hidden; }
+    .img-item img { width: 100%; height: 100%; object-fit: cover; }
+    .btn-remove { position: absolute; top: 0; right: 0; background: #ef4444; color: white; width: 22px; height: 22px; font-size: 14px; display: flex; align-items: center; justify-content: center; cursor: pointer; border: none; font-weight: bold; border-bottom-left-radius: 6px; }
+</style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useRef, Fragment } = React;
+
+const renderFraction = (text) => {
+    if (!text) return "";
+    return text.replace(/(\d+)\s*\|\s*(\d+)/g, (match, tu, mau) => {
+        return `<table style="display: inline-table; vertical-align: middle; border: none; border-collapse: collapse; margin: 0 2px;">
+            <tr><td style="border: none !important; border-bottom: 0.5pt solid black !important; padding: 0 !important; text-align: center; line-height: 1; font-size: 13pt;">${tu}</td></tr>
+            <tr><td style="border: none !important; padding: 0 !important; text-align: center; line-height: 1; font-size: 13pt;">${mau}</td></tr>
+        </table>`;
+    });
+};
+
+        const App = () => {
+            const [apiKey, setApiKey] = useState(localStorage.getItem("gemini_api_key") || "");
+            const [loading, setLoading] = useState(false);
+            const [status, setStatus] = useState("Sẵn sàng");
+            const [images, setImages] = useState([]); 
+            const [lessonPlan, setLessonPlan] = useState(null);
+
+            const [showApiModal, setShowApiModal] = useState(false);
+            const [tempApiValue, setTempApiValue] = useState("");
+            const [revealKey, setRevealKey] = useState(false);
+
+            const handleApiKeyChange = (value) => {
+                setApiKey(value);
+                localStorage.setItem("gemini_api_key", value);
+            };
+
+            const openApiModal = () => {
+                setTempApiValue(apiKey || "");
+                setRevealKey(false);
+                setShowApiModal(true);
+            };
+            const closeApiModal = () => setShowApiModal(false);
+            const saveApiKeyFromModal = () => {
+                handleApiKeyChange(tempApiValue.trim());
+                setShowApiModal(false);
+            };
+            const clearApiKey = () => {
+                setApiKey("");
+                localStorage.removeItem("gemini_api_key");
+                setStatus("Sẵn sàng");
+            };
+
+            const [tenBaiNhap, setTenBaiNhap] = useState("");
+            const [monHocNhap, setMonHocNhap] = useState("");
+            const [lopNhap, setLopNhap] = useState("");
+            const [chuDe, setChuDe] = useState("");
+            const [userPrompt, setUserPrompt] = useState("");
+            const [startDate, setStartDate] = useState("");
+            const [endDate, setEndDate] = useState("");
+            const [baiSo, setBaiSo] = useState("");
+            const [tietSo, setTietSo] = useState("");
+            const [integratedContent, setIntegratedContent] = useState("");
+
+            const fileInputRef = useRef(null);
+            const cameraInputRef = useRef(null);
+
+            const capitalizeFirstLetter = (string) => {
+                if (!string) return "";
+                return string.charAt(0).toUpperCase() + string.slice(1);
+            };
+
+            const formatDate = (dateStr) => {
+                if (!dateStr) return ".../.../202...";
+                const [y, m, d] = dateStr.split('-');
+                return `${d}/${m}/${y}`;
+            };
+
+            const handleFileUpload = (e) => {
+    const files = Array.from(e.target.files);
+    files.forEach(file => {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            const img = new Image();
+            img.src = event.target.result;
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                
+                // CẤU HÌNH GIẢM ĐỘ PHÂN GIẢI
+                const MAX_WIDTH = 1200; // Độ rộng tối đa (đủ để AI đọc rõ chữ)
+                let width = img.width;
+                let height = img.height;
+
+                if (width > MAX_WIDTH) {
+                    height *= MAX_WIDTH / width;
+                    width = MAX_WIDTH;
+                }
+
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, width, height);
+
+                // NÉN CHẤT LƯỢNG (0.7 là mức tối ưu: ảnh nhẹ nhưng chữ vẫn nét)
+                const compressedData = canvas.toDataURL('image/jpeg', 0.7); 
+
+                const newImg = {
+                    id: Date.now() + Math.random(),
+                    data: compressedData.split(',')[1],
+                    preview: compressedData
+                };
+                
+                setImages(prev => {
+                    const updated = [...prev, newImg];
+                    setStatus(`📸 Đã tối ưu & nhận ${updated.length} ảnh.`);
+                    return updated;
+                });
+            };
+        };
+        reader.readAsDataURL(file);
+    });
+    e.target.value = null;
+};
+
+            const removeImage = (id) => {
+                setImages(prev => {
+                    const updated = prev.filter(img => img.id !== id);
+                    if (updated.length === 0) {
+                        setStatus("Sẵn sàng");
+                    } else {
+                        setStatus(`📸 Còn lại ${updated.length} ảnh.`);
+                    }
+                    return updated;
+                });
+            };
+
+            const callApiWithRetry = async (payload, retries = 3) => {
+                const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+                for (let i = 0; i < retries; i++) {
+                    try {
+                        const response = await fetch(url, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(payload)
+                        });
+                        if (response.ok) return await response.json();
+                        await new Promise(res => setTimeout(res, Math.pow(2, i) * 1000));
+                    } catch (e) {
+                        if (i === retries - 1) throw e;
+                        await new Promise(res => setTimeout(res, Math.pow(2, i) * 1000));
+                    }
+                }
+            };
+
+            const generateLessonPlan = async () => {
+    if (!apiKey) { 
+        alert("Vui lòng nhập Mã khóa _ Liên hệ Thầy Kim _ ĐT: 0964567806!"); 
+        return; 
+    }
+
+    // ĐIỀU KIỆN MỚI: Chỉ chặn khi CẢ HAI cùng trống
+    // Nếu có Tên bài (hoặc) có Ảnh thì sẽ KHÔNG bị chặn
+    if (!tenBaiNhap.trim() && images.length === 0) {
+        alert("Bạn cần nhập 'Tên bài dạy' hoặc 'Gửi ảnh' để AI có dữ liệu soạn bài nhé!");
+        return;
+    }
+
+    setLoading(true);
+    setStatus("🚀 AI đang soạn bài... vui lòng đợi.");
+    // ... code tiếp theo
+                
+                const systemPrompt = `Bạn là chuyên gia soạn giáo án Tiểu học Việt Nam theo Công văn 2345.
+Trả về JSON: { 
+  "mon": "", 
+  "bai_ten": "", 
+  "yeu_cau_can_dat": { "nang_luc_dac_thu": "", "nang_luc_chung": "", "pham_chat": "" }, 
+  "noi_dung_tich_hop": "",
+  "do_dung": { "gv": "", "hs": "" }, 
+  "hoat_dong": [ { "loai": "khởi động", "steps": [{ "gv": "", "hs": "" }] }, { "loai": "khám phá", "steps": [{ "gv": "", "hs": "" }] }, { "loai": "luyện tập - thực hành", "steps": [{ "gv": "", "hs": "" }] }, { "loai": "vận dụng", "steps": [{ "gv": "", "hs": "" }] }, { "loai": "nối tiếp", "steps": [{ "gv": "", "hs": "" }] } ] 
+}
+Lưu ý quan trọng:
+- Lưu ý quan trọng về 'noi_dung_tich_hop':
+- Nếu ô 'integratedContent' có dữ liệu, hãy giữ nguyên nội dung đó.
+- Nếu có nhiều nội dung (ví dụ Công dân số, An toàn mạng...), AI phải viết mỗi nội dung trên MỘT DÒNG RIÊNG BIỆT, phân cách bằng ký tự xuống dòng (\n).
+- Mỗi nội dung tích hợp phải trình bày theo cấu trúc: "[Tên tiêu đề]: [Nội dung AI tự soạn chi tiết và phù hợp với bài học]".
+- Ví dụ nếu ghi "công dân số, môi trường", AI trả về:
+  "Công dân số: Biết sử dụng thiết bị số an toàn...
+   Bảo vệ môi trường: Giáo dục ý thức giữ gìn vệ sinh lớp học..."
+- Tuyệt đối không được bỏ sót bất kỳ nội dung nào giáo viên đã yêu cầu trong ô ghi chú.
+- Nếu cả 2 ô trên trống, AI tự suy luận dựa trên bài học.
+- Luôn đảm bảo có dấu hai chấm (:) giữa tiêu đề và nội dung.
+- QUY TẮC LỒNG GHÉP VÀO BẢNG: AI phải phân tích và CHỈ CHỌN 01 hoặc 02 hoạt động phù hợp nhất để chèn nội dung tích hợp. TUYỆT ĐỐI không chèn vào nhiều hoạt động.
+- Dòng lồng ghép ghi ở cuối cột 'gv' của hoạt động đã chọn: "(Tích hợp [Tên nội dung]): [Hành động cụ thể, ngắn gọn]".
+- Đồ dùng: Kh  ng liệt kê phấn, bảng, SGK, máy tính, ti vi, vở bài tập, sách giáo khoa, máy chiếu.
+- Bắt buộc câu hỏi bên cột giáo viên phải ghi ngang với câu trả lời của học sinh, không ghi lệch.
+- Bắt buộc Bài soạn phải chi tiết.
+- Không dùng từ thầy/cô.
+- Chữ cái đầu câu viết hoa.`;
+
+                try {
+                    const promptText = `Soạn bài: ${tenBaiNhap || "Theo ảnh"}. Môn: ${monHocNhap}. Lớp: ${lopNhap}. Chủ đề: ${chuDe}. Nội dung tích hợp yêu cầu: ${integratedContent}. Ghi chú thêm: ${userPrompt}.`;
+                    const parts = [{ text: promptText }];
+                    images.forEach(img => parts.push({ inlineData: { mimeType: "image/png", data: img.data } }));
+
+                    const payload = {
+                        contents: [{ parts }],
+                        systemInstruction: { parts: [{ text: systemPrompt }] },
+                        generationConfig: { responseMimeType: "application/json", temperature: 0.1 }
+                    };
+
+                    const result = await callApiWithRetry(payload);
+                    const rawText = result.candidates?.[0]?.content?.parts?.[0]?.text;
+                    if (rawText) {
+                        setLessonPlan(JSON.parse(rawText.trim()));
+                        setStatus("✅ Giáo án đã soạn xong!");
+                    }
+                } catch (error) {
+                    setStatus("❌ Bạn đã hết lượt soạn bài. Hãy liên hệ: 0964567806 để được hỗ trợ. Hoặc quay lại vào hôm sau.");
+                } finally {
+                    setLoading(false);
+                }
+            };
+
+            const exportToWord = () => {
+    const element = document.getElementById('lesson-plan-content');
+    const header = `
+        <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+        <head><meta charset='utf-8'>
+        <style>
+            /* Cấu hình trang A4: Trái 3, còn lại 2 */
+            @page Section1 { 
+                size: 595.3pt 841.9pt; 
+                margin: 2cm 2cm 2cm 3cm; 
+                mso-header-margin: 35.4pt; 
+                mso-footer-margin: 35.4pt; 
+            }
+            div.Section1 { page: Section1; }
+            
+            /* Font chuẩn và Line Spacing Single */
+            body { 
+                font-family: 'Times New Roman'; 
+                font-size: 14pt; 
+                line-height: 1.0; /* Single spacing */
+            }
+
+            /* Cấu hình Spacing Before/After 6pt cho các đoạn văn */
+            p, div { 
+                margin: 0in; 
+                margin-top: 6pt; 
+                margin-bottom: 6pt; 
+            }
+
+            table { 
+                border-collapse: collapse; 
+                width: 100%; 
+                mso-table-lspace: 0pt; 
+                mso-table-rspace: 0pt; 
+            }
+
+            /* Đảm bảo kẻ ngang khi ngắt trang */
+            td { 
+                border: 0.5pt solid black; 
+                padding: 6pt; 
+                vertical-align: top; 
+                mso-border-alt: 0.5pt solid black;
+            }
+
+            .no-border-top { 
+                border-top: 0.5pt solid white !important; 
+                mso-border-top-alt: 0.5pt solid white !important; 
+            }
+
+            /* Phân số không được có viền bảng */
+            table table td { border: none !important; mso-border-alt: none !important; padding: 0 !important; }
+        </style>
+        </head>
+        <body><div class="Section1">${element.innerHTML}</div></body></html>`;
+    
+    const blob = new Blob(['\ufeff', header], { type: 'application/msword' });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = `GiaoAn_${tenBaiNhap || 'Moi'}.doc`;
+    link.click();
+};
+
+            const rawIntegrated = integratedContent || (lessonPlan?.noi_dung_tich_hop || "");
+            const integratedLines = rawIntegrated.split('\n').filter(line => line.trim() !== "");
+
+            return (
+                <div className="max-w-5xl mx-auto my-10 p-5">
+                    {/* Nút API key cố định góc phải trên */}
+                    <div className="fixed top-4 right-4 z-50">
+                        <button
+                            onClick={openApiModal}
+                            className="flex items-center gap-2 bg-slate-900 text-white px-3 py-2 rounded-full shadow-lg hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                            aria-label="Nhập mã khóa API"
+                            title="Nhập mã khóa API"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 11c0-1.657-1.343-3-3-3S6 9.343 6 11s1.343 3 3 3 3-1.343 3-3zM21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7" />
+                            </svg>
+                            <span className="text-sm hidden sm:inline">{apiKey ? "Mã khóa đã lưu" : "Nhập Mã khóa"}</span>
+                        </button>
+                    </div>
+
+                    {/* Modal nhập API key */}
+                    {showApiModal && (
+                        <div className="fixed inset-0 z-40 flex items-center justify-center p-4">
+                            <div className="absolute inset-0 bg-black/40" onClick={closeApiModal} aria-hidden="true"></div>
+
+                            <div className="relative z-50 w-full max-w-xl bg-white rounded-lg shadow-xl overflow-hidden
+                                            sm:mx-4"
+                                 role="dialog" aria-modal="true" aria-labelledby="api-modal-title">
+                                <div className="p-4 sm:p-6">
+                                    <div className="flex items-start justify-between">
+                                        <h3 id="api-modal-title" className="text-lg font-semibold">Nhập / Quản lý Mã Khóa API</h3>
+                                        <button onClick={closeApiModal} className="text-slate-500 hover:text-slate-700">
+                                            ✕
+                                        </button>
+                                    </div>
+
+                                    <p className="text-sm text-slate-500 mt-2">Mã khóa dùng để gọi AI.</p>
+
+                                    <div className="mt-4">
+                                        <label className="block text-sm text-slate-700 mb-1">Mã khóa:</label>
+                                        <div className="flex gap-2">
+                                            <input
+                                                type={revealKey ? "text" : "password"}
+                                                className="flex-1 p-2 border rounded bg-slate-50"
+                                                placeholder="Nhập mã khóa ở đây..."
+                                                value={tempApiValue}
+                                                onChange={e => setTempApiValue(e.target.value)}
+                                            />
+                                            <button
+                                                onClick={() => setRevealKey(v => !v)}
+                                                className="px-3 py-2 bg-slate-100 rounded hover:bg-slate-200"
+                                                aria-pressed={revealKey}
+                                                title={revealKey ? "Ẩn" : "Hiện"}
+                                            >
+                                                {revealKey ? "Ẩn" : "Hiện"}
+                                            </button>
+                                            <button
+                                                onClick={() => { setTempApiValue(""); setRevealKey(false); }}
+                                                className="px-3 py-2 bg-rose-100 text-rose-700 rounded hover:bg-rose-200"
+                                            >
+                                                Xóa
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <div className="mt-4 flex justify-end gap-3">
+                                        <button onClick={clearApiKey} className="px-4 py-2 bg-rose-600 text-white rounded hover:bg-rose-500">Xóa vĩnh viễn</button>
+                                        <button onClick={closeApiModal} className="px-4 py-2 bg-slate-200 rounded hover:bg-slate-300">Hủy</button>
+                                        <button onClick={saveApiKeyFromModal} className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-500">Lưu</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    <div className="bg-slate-900 p-6 rounded-xl text-white shadow-2xl">
+                        <h1 className="text-xl font-bold mb-6 flex items-center gap-2">🏫 TRỢ LÝ AI SOẠN KHBD TIỂU HỌC</h1>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                            {/* ĐÃ LOẠI BỎ ô nhập password ở đây — người dùng dùng nút góc phải để nhập */}
+                            <div className="flex items-center gap-3">
+                                <div className="text-xs text-slate-400">Trạng thái API:</div>
+                                <div className={`px-2 py-1 rounded text-sm ${apiKey ? 'bg-emerald-600 text-black' : 'bg-yellow-500 text-black'}`}>
+                                    {apiKey ? "Đã lưu" : "Chưa có"}
+                                </div>
+                                {apiKey && (
+                                    <button onClick={() => { setRevealKey(v=>!v); alert(`Mã khóa (ẩn/hiện chỉ trong modal): ${revealKey ? apiKey : '•'.repeat(8)}`); }} className="ml-2 text-xs text-slate-300 hover:underline">Xem nhanh</button>
+                                )}
+                            </div>
+
+                            <div className="flex gap-2">
+                                <input type="text" placeholder="Môn..." className="p-2 rounded bg-slate-800 w-full" value={monHocNhap} onChange={e => setMonHocNhap(e.target.value)} />
+                                <input type="text" placeholder="Lớp..." className="p-2 rounded bg-slate-800 w-full" value={lopNhap} onChange={e => setLopNhap(e.target.value)} />
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                            <input type="text" placeholder="Chủ đề..." className="p-2 rounded bg-slate-800" value={chuDe} onChange={e => setChuDe(e.target.value)} />
+                            <input type="text" placeholder="Tên bài dạy..." className="p-2 rounded bg-slate-800" value={tenBaiNhap} onChange={e => setTenBaiNhap(e.target.value)} />
+                            <div className="flex gap-2">
+                                <input type="text" placeholder="Bài số..." className="p-2 rounded bg-slate-800 w-full" value={baiSo} onChange={e => setBaiSo(e.target.value)} />
+                                <input type="text" placeholder="Tiết..." className="p-2 rounded bg-slate-800 w-full" value={tietSo} onChange={e => setTietSo(e.target.value)} />
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                            <div className="flex flex-col">
+                                <label className="text-xs text-slate-400 mb-1">Từ ngày:</label>
+                                <input type="date" className="p-2 rounded bg-slate-800" value={startDate} onChange={e => setStartDate(e.target.value)} />
+                            </div>
+                            <div className="flex flex-col">
+                                <label className="text-xs text-slate-400 mb-1">Đến ngày:</label>
+                                <input type="date" className="p-2 rounded bg-slate-800" value={endDate} onChange={e => setEndDate(e.target.value)} />
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                            <textarea placeholder="Nội dung tích hợp..." className="p-2 rounded bg-slate-800 h-20" value={integratedContent} onChange={e => setIntegratedContent(e.target.value)} />
+                            <textarea placeholder="Ghi chú cho AI..." className="p-2 rounded bg-slate-800 h-20" value={userPrompt} onChange={e => setUserPrompt(e.target.value)} />
+                        </div>
+
+                        {images.length > 0 && (
+                            <div className="mb-4 bg-slate-800 p-3 rounded-lg">
+                                <p className="text-xs text-blue-400 mb-2 font-bold uppercase tracking-wider">Danh sách ảnh đã chọn:</p>
+                                <div className="img-preview-container">
+                                    {images.map(img => (
+                                        <div key={img.id} className="img-item shadow-lg">
+                                            <img src={img.preview} alt="preview" />
+                                            <button className="btn-remove" title="Xóa ảnh này" onClick={() => removeImage(img.id)}>✕</button>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        <div className="flex flex-wrap gap-3 items-center border-t border-slate-800 pt-6">
+                            <button onClick={() => cameraInputRef.current.click()} className="bg-blue-600 px-4 py-3 rounded-lg hover:bg-blue-500 transition font-bold flex items-center gap-2">
+                                📷 Chụp ảnh
+                            </button>
+                            <button onClick={() => fileInputRef.current.click()} className="bg-slate-700 px-4 py-3 rounded-lg hover:bg-slate-600 transition font-bold">
+                                📁 Chọn ảnh
+                            </button>
+                            
+                            <input type="file" ref={cameraInputRef} className="hidden" accept="image/*" capture="environment" onChange={handleFileUpload} />
+                            <input type="file" ref={fileInputRef} className="hidden" accept="image/*" multiple onChange={handleFileUpload} />
+                            
+                            <button onClick={generateLessonPlan} disabled={loading} className="flex-1 bg-yellow-500 text-black font-bold px-8 py-3 rounded-lg hover:bg-yellow-400 disabled:bg-slate-500 shadow-lg">
+                                {loading ? "⏳ Đang soạn..." : "✨ Soạn ngay"}
+                            </button>
+
+                            {lessonPlan && (
+                                <button onClick={exportToWord} className="bg-green-600 px-6 py-3 rounded-lg hover:bg-green-500 transition font-bold shadow-lg">📥 Word</button>
+                            )}
+                        </div>
+                        <p className="text-xs mt-4 text-slate-400 font-mono italic">{status}</p>
+                    </div>
+
+                    <div className="mt-10 p-10 bg-white rounded-xl shadow-lg min-h-[500px] overflow-x-auto border border-slate-200">
+                        {lessonPlan ? (
+                            <div id="lesson-plan-content" className="word-content" style={{fontSize: '14pt'}}>
+                                <div style={{ textAlign: 'center', marginBottom: '12pt' }}>
+                                    <h2 style={{ fontWeight: 'bold', textTransform: 'uppercase', margin: '0' }}>KẾ HOẠCH BÀI DẠY</h2>
+                                    <p style={{ fontWeight: 'bold', textTransform: 'uppercase', margin: '5pt 0' }}>Môn: {monHocNhap || lessonPlan.mon} - Lớp {lopNhap}</p>
+                                    {chuDe && <p style={{ fontWeight: 'bold', margin: '0' }}>Chủ đề: {chuDe}</p>}
+                                    <p style={{ fontWeight: 'bold', margin: '5pt 0' }}>
+                                        Bài {baiSo && `${baiSo}: `} {tenBaiNhap || lessonPlan.bai_ten} {tietSo && `(Tiết ${tietSo})`}
+                                    </p>
+                                    <p style={{ fontStyle: 'italic', margin: '0' }}>
+                                        Thời gian thực hiện: Từ ngày {formatDate(startDate)} đến ngày {formatDate(endDate)}
+                                    </p>
+                                </div>
+
+                                <p style={{ fontWeight: 'bold', textTransform: 'uppercase' }}>I. YÊU CẦU CẦN ĐẠT</p>
+{/* THÊM textAlign: 'justify' VÀO ĐÂY */}
+<div style={{ marginLeft: '15pt', textAlign: 'justify' }}> 
+    <div style={{ marginBottom: '10pt' }}>
+    <strong>1. Năng lực đặc thù</strong>
+    <div style={{ marginLeft: '15pt', marginTop: '3pt', textAlign: 'justify' }}>
+        {lessonPlan.yeu_cau_can_dat?.nang_luc_dac_thu.split('.').map((item, index) => {
+            const trimmedItem = item.trim();
+            if (!trimmedItem) return null; // Bỏ qua dòng trống nếu có dấu chấm thừa ở cuối
+            return (
+                <div key={index} style={{ marginBottom: '4pt', display: 'block' }}>
+                    - {capitalizeFirstLetter(trimmedItem)}.
+                </div>
+            );
+        })}
+    </div>
+</div>
+    
+    <div style={{ marginBottom: '10pt' }}>
+    <strong>2. Năng lực chung</strong>
+    <div style={{ marginLeft: '15pt', marginTop: '3pt', textAlign: 'justify' }}>
+        {(lessonPlan.yeu_cau_can_dat?.nang_luc_chung || "").split('\n').map((line, index) => {
+            const trimmedLine = line.trim();
+            if (!trimmedLine) return null;
+
+            // Tách các ý nhỏ nếu AI viết chung một dòng có dấu chấm
+            return trimmedLine.split(/(?<=\.)\s+/).map((subLine, subIndex) => {
+                const finalLine = subLine.trim();
+                if (!finalLine) return null;
+
+                const colonIndex = finalLine.indexOf(':');
+                return (
+                    <div key={`${index}-${subIndex}`} style={{ 
+                        marginBottom: '4pt', 
+                        display: 'block', // Đảm bảo luôn xuống dòng
+                        lineHeight: '1.5' 
+                    }}>
+                        {colonIndex !== -1 ? (
+                            <>
+                                - <strong>{finalLine.substring(0, colonIndex).replace(/^-?\s*/, '')}:</strong>
+                                {finalLine.substring(colonIndex + 1)}
+                            </>
+                        ) : (
+                            `- ${capitalizeFirstLetter(finalLine)}`
+                        )}
+                    </div>
+                );
+            });
+        })}
+    </div>
+</div>
+    
+    <div style={{ marginBottom: '10pt' }}>
+    <strong>3. Phẩm chất</strong>
+    <div style={{ marginLeft: '15pt', marginTop: '3pt', textAlign: 'justify' }}>
+        {(lessonPlan.yeu_cau_can_dat?.pham_chat || "").split('\n').map((line, index) => {
+            const trimmedLine = line.trim();
+            if (!trimmedLine) return null;
+
+            // Tự động tách dòng nếu AI viết các phẩm chất dính nhau bằng dấu chấm
+            return trimmedLine.split(/(?<=\.)\s+/).map((subLine, subIndex) => {
+                const finalLine = subLine.trim();
+                if (!finalLine) return null;
+
+                const colonIndex = finalLine.indexOf(':');
+                return (
+                    <div key={`${index}-${subIndex}`} style={{ 
+                        marginBottom: '4pt', 
+                        display: 'block', 
+                        lineHeight: '1.5' 
+                    }}>
+                        {colonIndex !== -1 ? (
+                            <>
+                                - <strong>{finalLine.substring(0, colonIndex).replace(/^-?\s*/, '')}:</strong>
+                                {finalLine.substring(colonIndex + 1)}
+                            </>
+                        ) : (
+                            `- ${capitalizeFirstLetter(finalLine)}`
+                        )}
+                    </div>
+                );
+            });
+        })}
+    </div>
+</div>
+
+ {/* Mục 4: Nội dung tích hợp - Tự động tách dòng chuyên nghiệp */}
+{(integratedContent || lessonPlan?.noi_dung_tich_hop) && (
+    <div style={{ marginBottom: '10pt', textAlign: 'justify' }}>
+        <p style={{ fontWeight: 'bold' }}>4. Nội dung tích hợp</p>
+        <div style={{ marginLeft: '15pt' }}>
+            {(() => {
+                const rawContent = integratedContent.trim() ? integratedContent : (lessonPlan?.noi_dung_tich_hop || "");
+                
+                // Tách nội dung dựa trên dấu xuống dòng HOẶC dấu chấm sau đó là tiêu đề mới
+                // Thủ thuật: Tách theo các từ khóa phổ biến có dấu hai chấm
+                const lines = rawContent.split(/\n/); 
+
+                return lines.map((line, idx) => {
+                    const trimmedLine = line.trim();
+                    if (!trimmedLine) return null;
+
+                    // Kiểm tra xem dòng này có chứa tiêu đề (có dấu hai chấm) không
+                    const parts = trimmedLine.split(':');
+                    
+                    return (
+                        <div key={idx} style={{ marginBottom: '6pt', display: 'block' }}>
+                            {parts.length > 1 ? (
+                                <span>
+                                    - <strong>{parts[0].replace(/^-?\s*/, '').trim()}:</strong> 
+                                    {parts.slice(1).join(':')}
+                                </span>
+                            ) : (
+                                `- ${capitalizeFirstLetter(trimmedLine)}`
+                            )}
+                        </div>
+                    );
+                });
+            })()}
+        </div>
+    </div>
+)}
+				</div>
+
+                               <p style={{ fontWeight: 'bold', textTransform: 'uppercase', marginTop: '15pt' }}>II. ĐỒ DÙNG DẠY HỌC</p>
+
+{/* THÊM DÒNG NÀY ĐỂ BẮT ĐẦU CANH ĐỀU */}
+<div style={{ marginLeft: '15pt', textAlign: 'justify' }}> 
+    <p>- GV: {lessonPlan.do_dung?.gv}</p>
+    <p>- HS: {lessonPlan.do_dung?.hs}</p>
+</div> 
+{/* ĐÓNG THẺ DIV TẠI ĐÂY */}
+
+                                <p style={{ fontWeight: 'bold', textTransform: 'uppercase', marginTop: '15pt' }}>III. CÁC HOẠT ĐỘNG DẠY HỌC CHỦ YẾU</p>
+                                <table style={{ width: '100%', borderCollapse: 'collapse', border: '0.5pt solid black', borderSpacing: 0 }}>
+    <thead>
+        <tr style={{ backgroundColor: '#f3f4f6' }}>
+            <td style={{ textAlign: 'center', fontWeight: 'bold', width: '50%', border: '0.5pt solid black', padding: '8px' }}>Hoạt động của giáo viên</td>
+            <td style={{ textAlign: 'center', fontWeight: 'bold', width: '50%', border: '0.5pt solid black', padding: '8px' }}>Hoạt động của học sinh</td>
+        </tr>
+    </thead>
+    <tbody>
+        {lessonPlan.hoat_dong?.map((act, i) => (
+            <Fragment key={i}>
+                {/* Dòng tiêu đề hoạt động lớn */}
+                <tr>
+                    <td colSpan="2" style={{ fontWeight: 'bold', fontStyle: 'italic', backgroundColor: '#f9fafb', border: '0.5pt solid black', padding: '8px' }}>
+                        {i+1}. Hoạt động {act.loai}
+                    </td>
+                </tr>
+                
+                {act.steps?.map((step, j) => (
+                    <tr key={j}>
+                      {/* Cột Giáo viên - ĐÃ SỬA ĐỂ ẨN KẺ NGANG */}
+<td 
+    className={j > 0 ? "no-border-top" : ""} // Thêm class cho file Word
+    style={{ 
+        padding: '8px', 
+        verticalAlign: 'top',
+        textAlign: 'justify',
+        borderLeft: '0.5pt solid black', 
+        borderRight: '0.5pt solid black',
+        // Nếu là bước cuối cùng thì mới có kẻ dưới, nếu không thì none
+        borderBottom: j === act.steps.length - 1 ? '0.5pt solid black' : 'none',
+        // Nếu là bước thứ 2 trở đi (j > 0) thì ẩn kẻ trên
+        borderTop: j > 0 ? 'none' : '0.5pt solid black'
+    }}
+>
+    {step.gv.split('\n').map((line, lineIdx) => {
+        const trimmedLine = line.trim();
+        if (!trimmedLine) return null;
+        const isTichHop = trimmedLine.includes('Tích hợp');
+        return (
+            <div key={lineIdx} style={{ 
+                marginBottom: isTichHop ? '2pt' : '4pt',
+                paddingTop: isTichHop ? '5pt' : '0pt' 
+            }}>
+                - {capitalizeFirstLetter(trimmedLine)}
+            </div>
+        );
+    })}
+</td>               
+                        {/* Cột Học sinh - Đã thêm canh đều và tự động xuống dòng */}
+<td style={{ 
+    padding: '8px', 
+    verticalAlign: 'top',
+    textAlign: 'justify', // Giúp canh đều hai bên lề
+    borderRight: '0.5pt solid black',
+    borderTop: 'none',
+    borderBottom: j === act.steps.length - 1 ? '0.5pt solid black' : 'none'
+}}>
+    {step.hs.split('\n').map((line, lineIdx) => {
+        const trimmedLine = line.trim();
+        if (!trimmedLine) return null;
+        return (
+            <div key={lineIdx} style={{ marginBottom: '4pt' }}>
+                - {capitalizeFirstLetter(trimmedLine)}
+            </div>
+        );
+    })}
+</td>
+                    </tr>
+                ))}
+            </Fragment>
+        ))}
+    </tbody>
+</table>
+			{/* MỤC IV ĐƯỢC THÊM Ở ĐÂY - NẰM SAU BẢNG */}
+    <div style={{ marginTop: '20pt' }}>
+        <p style={{ fontWeight: 'bold', textTransform: 'uppercase' }}>
+            IV. ĐIỀU CHỈNH SAU BÀI DẠY (NẾU CÓ)
+        </p>
+        <div style={{ marginTop: '5pt' }}>
+            <div style={{ borderBottom: '1pt dotted black', height: '25pt', width: '100%' }}></div>
+            <div style={{ borderBottom: '1pt dotted black', height: '25pt', width: '100%' }}></div>
+            <div style={{ borderBottom: '1pt dotted black', height: '25pt', width: '100%' }}></div>
+        </div>
+    </div>
+                            </div>
+                        ) : (
+                            <div className="text-center text-slate-300 mt-20 italic">Nhập dữ liệu và bấm "Soạn ngay" để bắt đầu.</div>
+                        )}
+                    </div>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
